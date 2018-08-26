@@ -39,7 +39,7 @@
 		<script src="models/OBJLoader.js"></script>
                 <script src="models/MTLLoader.js"></script>
 		
-        <script id="fs-hdr" type="x-shader/x-fragment">
+		<script id="fs-hdr" type="x-shader/x-fragment">
 
 			uniform sampler2D   tDiffuse;
 			uniform float       exposure;
@@ -50,12 +50,12 @@
 			void main()	{
 
 				vec4 pixel = texture2D( tDiffuse, vUv );
-				
+
 				pixel *= exposure;
-				
+
 				//Simplest Reinhard Tone Mapping
 				//pixel.xyz = pixel.xyz/(pixel.xyz + vec3(1.0));
-				
+
 				// Simplest Reinhard Tone Mapping with Luminance
 				/*
 				float L = 0.2126 * pixel.x + 0.7152 * pixel.y + 0.0722 * pixel.z;
@@ -65,7 +65,7 @@
 				pixel.y *= scale;
 				pixel.z *= scale;
 			       */
-			
+
 			       //Better Reinhard Tone Mapping
 				float L = 0.2126 * pixel.x + 0.7152 * pixel.y + 0.0722 * pixel.z;
 				float nL = L * (L/(brightMax*brightMax) + 1.0) / (L + 1.0);
@@ -73,7 +73,7 @@
 				pixel.x *= scale;
 				pixel.y *= scale;
 				pixel.z *= scale;
-            
+
 				gl_FragColor = vec4( pixel.xyz, 1.0 );
 
 			}
@@ -105,7 +105,7 @@
 			init();
 			animate();
 			function init() {
-			
+
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
 				renderer.setPixelRatio( window.devicePixelRatio );
 				renderer.setSize( window.innerWidth, window.innerHeight );
@@ -115,7 +115,7 @@
 				renderer.gammaOutput = true;
 				document.body.appendChild( renderer.domElement );
 				var gl = renderer.context;
-				
+
 				if ( ! gl.getExtension( 'OES_texture_float' ) ) {
 					alert( 'OES_texture_float not supported' );
 					throw 'missing webgl extension';
@@ -124,26 +124,26 @@
 					alert( 'OES_texture_float_linear not supported' );
 					throw 'missing webgl extension';
 				}
-				
+
 				camera = new THREE.PerspectiveCamera( 80, window.innerWidth / window.innerHeight, 1, 1000 );
 				camera.position.set( 0,8, 48);
 				bufferScene = new THREE.Scene();
 				var ambient = new THREE.AmbientLight( 0xffffff, 0.3 );
 				bufferScene.add( ambient );
-				
+
 				scene = new THREE.Scene();
-				
+
 				var renderTargetParams = {
 				  minFilter:THREE.LinearFilter,
 				  format:THREE.RGBAFormat,
 				  type:THREE.FloatType,
 				  stencilBuffer:false
 				};
-				
+
 				bufferTexture = new THREE.WebGLRenderTarget( 4096, 4096, renderTargetParams );
-				
+
 				bufferTextureMat = new THREE.ShaderMaterial({
-                                    uniforms: {
+				    uniforms: {
 						tDiffuse:  { value: bufferTexture.texture},
 						exposure:  { value: 0.1},
 						brightMax: { value: 10.0 }
@@ -151,10 +151,10 @@
 					vertexShader: getText( 'vs-hdr' ),
 					fragmentShader: getText( 'fs-hdr' )
 				});
-				
+
 				//compileShader(gl, document.getElementById('vs-hdr').textContent, gl.VERTEX_SHADER);
 				//compileShader(gl, document.getElementById('fs-hdr').textContent, gl.FRAGMENT_SHADER);
-				
+
 				var bufferTextureGeo = new THREE.PlaneGeometry( window.innerWidth, window.innerHeight);
 				bufferTextureMesh = new THREE.Mesh( bufferTextureGeo, bufferTextureMat );
 				bufferTextureMesh.position.z = 30.0;
@@ -163,7 +163,7 @@
 				bufferTextureMesh.rotation.z = -Math.PI/180;
 				bufferTextureMesh.scale.set(0.1,0.1,0.1);
 				scene.add( bufferTextureMesh );
-				
+
 				spotLight = new THREE.SpotLight( 0xffffff, 75);
 				spotLight.position.set( 0, 0, 10 );
 				spotLight.angle = Math.PI / 8;
@@ -180,7 +180,7 @@
 				bufferScene.add( spotLight );
 				lightHelper = new THREE.SpotLightHelper( spotLight );
 				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
-				
+
 				spotLight = new THREE.SpotLight( 0xffffff, 7);
 				spotLight.position.set( 0, 20, 0 );
 				spotLight.angle = Math.PI / 2;
@@ -195,7 +195,7 @@
 				bufferScene.add( spotLight );
 				lightHelper = new THREE.SpotLightHelper( spotLight );
 				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
-				
+
 				spotLight = new THREE.SpotLight( 0xffffff, 75);
 				spotLight.position.set( 40, 11, 0 );
 				spotLight.angle = Math.PI / 40;
@@ -212,7 +212,7 @@
 				bufferScene.add( spotLight );
 				lightHelper = new THREE.SpotLightHelper( spotLight );
 				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
-				
+
 				spotLight = new THREE.SpotLight( 0xffffff, 75);
 				spotLight.position.set( 40, 11, 10 );
 				spotLight.angle = Math.PI / 40;
@@ -229,7 +229,7 @@
 				bufferScene.add( spotLight );
 				lightHelper = new THREE.SpotLightHelper( spotLight );
 				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
-				
+
 				spotLight = new THREE.SpotLight( 0xffffff, 75);
 				spotLight.position.set( 40, 11, -10 );
 				spotLight.angle = Math.PI / 40;
@@ -246,7 +246,7 @@
 				bufferScene.add( spotLight );
 				lightHelper = new THREE.SpotLightHelper( spotLight );
 				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
-				
+
 				spotLight = new THREE.SpotLight( 0xffffff, 75);
 				spotLight.position.set( 0, 11, 0 );
 				spotLight.angle = Math.PI / 30;
@@ -263,7 +263,7 @@
 				bufferScene.add( spotLight );
 				lightHelper = new THREE.SpotLightHelper( spotLight );
 				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
-				
+
 				spotLight = new THREE.SpotLight( 0xffffff, 75);
 				spotLight.position.set( 0, 11, 10 );
 				spotLight.angle = Math.PI / 30;
@@ -280,7 +280,7 @@
 				bufferScene.add( spotLight );
 				lightHelper = new THREE.SpotLightHelper( spotLight );
 				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
-				
+
 				spotLight = new THREE.SpotLight( 0xffffff, 75);
 				spotLight.position.set( 0, 11, -10 );
 				spotLight.angle = Math.PI / 30;
@@ -298,13 +298,13 @@
 				lightHelper = new THREE.SpotLightHelper( spotLight );
 				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
 
-				
+
 				var geoFloor = new THREE.BoxBufferGeometry( 30, 15, 30 );
 				var standardMaterial = new THREE.MeshStandardMaterial( {color: 0x888888, transparent: false,side: THREE.BackSide, metalness: 0.0, roughness: 0.6} );
-			        mesh = new THREE.Mesh( geoFloor, standardMaterial);
+				mesh = new THREE.Mesh( geoFloor, standardMaterial);
 				mesh.receiveShadow = true;
-			        bufferScene.add( mesh );
-				
+				bufferScene.add( mesh );
+
 
 				var textureLoader = new THREE.TextureLoader();
 				textureLoader.load( "textures/brick_diffuse.jpg", function( map ) {
@@ -333,8 +333,8 @@
 					standardMaterial.roughnessMap = map;
 					standardMaterial.needsUpdate = true;
 				} );			
-				
-				
+
+
 				var matStdObjects = new THREE.MeshStandardMaterial( { color: 0xA00000, roughness: 0.4, metalness: 0.7 } );
 				var matStdBox = new THREE.MeshStandardMaterial( { color: 0x001FE2, roughness: 0.4, metalness: 0.9 } );
 				var geoBox = new THREE.BoxBufferGeometry( Math.PI*3, Math.sqrt( 2 )*2, Math.E );
@@ -358,7 +358,7 @@
 				mshStdKnot.castShadow = true;
 				mshStdKnot.receiveShadow = true;
 				bufferScene.add( mshStdKnot );
-				
+
 				var mtlLoaderTable = new THREE.MTLLoader();
 				mtlLoaderTable.setBaseUrl('models/table/');
 				mtlLoaderTable.setPath('models/table/');
@@ -370,7 +370,7 @@
 				    objLoaderTable.setMaterials(materials);
 				    objLoaderTable.setPath('models/table/');
 				    objLoaderTable.load('table.obj', function (object) {
-				        object.position.y = -7.5;
+					object.position.y = -7.5;
 					    object.position.z = 0;
 					    object.position.x = 2;
 					    object.scale.set(2,2,2);
@@ -420,7 +420,7 @@
 					    bufferScene.add(object);
 				      });
 				});				
-				
+
 				var mtlLoaderR2D2 = new THREE.MTLLoader();
 				mtlLoaderR2D2.setBaseUrl('models/r2-d2/');
 				mtlLoaderR2D2.setPath('models/r2-d2/');
@@ -455,12 +455,12 @@
 								 child.castShadow = true;
 							}
 						});
-					        bufferScene.add(object);
-				        });
+						bufferScene.add(object);
+					});
 				 });
-				
 
-				
+
+
 				var mtlLoaderBB = new THREE.MTLLoader();
 				mtlLoaderBB.setBaseUrl('models/bb/');
 				mtlLoaderBB.setPath('models/bb/');
@@ -486,7 +486,7 @@
 						bufferScene.add(object);
 					});
 				});
-				
+
 				var loader = new THREE.OBJLoader();
 				loader.load(
 					'models/roundWindow/roundWindow.obj',
@@ -500,7 +500,7 @@
 						bufferScene.add( object );
 					}
 				);
-				
+
 				var loader = new THREE.OBJLoader();
 				loader.load(
 					'models/roundWindow/roundWindow.obj',
@@ -514,7 +514,7 @@
 						bufferScene.add( object );
 					}
 				);
-				
+
 				var loader = new THREE.OBJLoader();
 				loader.load(
 					'models/roundWindow/roundWindow.obj',
@@ -533,56 +533,56 @@
 				var controls = new THREE.OrbitControls( camera, renderer.domElement );
 				controls.target.copy( mshStdBox.position );
 				controls.update();
-				
+
 				stats = new Stats();
 				container.appendChild( stats.dom );
 
 				var gui = new dat.GUI();
 				gui.add( params, 'exposure', 0.1, 10.0 ).onChange( animate );
 				gui.open();
-				
+
 			}
-			
+
 			function onResize() {
 				renderer.setSize( window.innerWidth, window.innerHeight );
 				camera.aspect = ( window.innerWidth / window.innerHeight );
 				camera.updateProjectionMatrix();
 			}
-			
+
 			function animate() {
 				requestAnimationFrame( animate );
-				
+
 				bufferTextureMat.uniforms.exposure.value = params.exposure;
-				
+
 				renderer.render( bufferScene, camera , bufferTexture, true );
 				renderer.render ( scene, camera);
 				stats.update();
 			}
-			
+
 			function getText( id ) {
 				return document.getElementById( id ).textContent;
 			}
-			
+
 			function compileShader(gl, shaderSource, shaderType) {
 			  // Create the shader object
 			  var shader = gl.createShader(shaderType);
-			 
+
 			  // Set the shader source code.
 			  gl.shaderSource(shader, shaderSource);
-			 
+
 			  // Compile the shader
 			  gl.compileShader(shader);
-			 
+
 			  // Check if it compiled
 			  var success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
 			  if (!success) {
 				// Something went wrong during compilation; get the error
 				throw "could not compile shader:" + gl.getShaderInfoLog(shader);
 			  }
-			 
+
 			  return shader;
 			}
-						
+
 
 		</script>
 	</body>
