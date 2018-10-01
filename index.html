@@ -53,10 +53,10 @@
 
 				pixel *= exposure;
 
-				//Simplest Reinhard Tone Mapping
+				//Simple Tone Mapping
 				//pixel.xyz = pixel.xyz/(pixel.xyz + vec3(1.0));
 
-				// Simplest Reinhard Tone Mapping with Luminance
+				// Simple Tone Mapping with Luminance
 				/*
 				float L = 0.2126 * pixel.x + 0.7152 * pixel.y + 0.0722 * pixel.z;
 				float nL = L / (L+1.0);
@@ -66,7 +66,7 @@
 				pixel.z *= scale;
 			       */
 
-			       //Better Reinhard Tone Mapping
+			       //Reinhard Tone Mapping
 				float L = 0.2126 * pixel.x + 0.7152 * pixel.y + 0.0722 * pixel.z;
 				float nL = L * (L/(brightMax*brightMax) + 1.0) / (L + 1.0);
 				float scale = nL / L;
