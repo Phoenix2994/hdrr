@@ -6,3 +6,5 @@
 - index.html contains the scene using HDR and a Reinhard's proposed algorithm.
 
 For more details Presentazione.pdf is available.
+
+Tested on Mozilla Firefox 62.0.2
