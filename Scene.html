@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Scene by Filippo Bianco</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				background-color: #000;
+				margin: 0px;
+				overflow: hidden;
+			}
+			#info {
+				position: absolute;
+				top: 0px; width: 100%;
+				color: #ffffff;
+				padding: 5px;
+				font-family: Monospace;
+				font-size: 13px;
+				text-align: center;
+			}
+			a {
+				color: #ff0080;
+				text-decoration: none;
+			}
+			a:hover {
+				color: #0080ff;
+			}
+		</style>
+	</head>
+	<body>
+
+		<div id="container"></div>
+		<script src="js/three.js"></script>
+		<script src="js/OrbitControls.js"></script>
+		<script src="js/dat.gui.min.js"></script>
+		<script src="js/stats.min.js"></script>
+		<script src="js/Detector.js"></script>
+		<script src="models/OBJLoader.js"></script>
+                <script src="models/MTLLoader.js"></script>
+		
+		<script id="fs-hdr" type="x-shader/x-fragment">
+
+			uniform sampler2D   tDiffuse;
+			uniform float       exposure;
+			uniform float       brightMax;
+
+			varying vec2  vUv;
+
+			void main()	{
+
+				vec4 pixel = texture2D( tDiffuse, vUv );
+
+				pixel *= exposure;
+
+				//Simple Tone Mapping
+				//pixel.xyz = pixel.xyz/(pixel.xyz + vec3(1.0));
+
+				// Simple Tone Mapping with Luminance
+				/*
+				float L = 0.2126 * pixel.x + 0.7152 * pixel.y + 0.0722 * pixel.z;
+				float nL = L / (L+1.0);
+				float scale = nL / L;
+				pixel.x *= scale;
+				pixel.y *= scale;
+				pixel.z *= scale;
+			    */
+                /*
+			       //Reinhard Tone Mapping
+				float L = 0.2126 * pixel.x + 0.7152 * pixel.y + 0.0722 * pixel.z;
+				float nL = L * (L/(brightMax*brightMax) + 1.0) / (L + 1.0);
+				float scale = nL / L;
+				pixel.x *= scale;
+				pixel.y *= scale;
+				pixel.z *= scale;
+                */
+				gl_FragColor = vec4( pixel.xyz, 1.0 );
+
+			}
+
+		</script>
+
+
+		<script id="vs-hdr" type="x-shader/x-vertex">
+
+			varying vec2 vUv;
+
+			void main()	{
+
+				vUv  = uv;
+				gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+			}
+
+		</script>
+		<script>
+			var container = document.getElementById( 'container' );
+			if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+			var renderer, scene, camera, bufferScene;
+			var origin = new THREE.Vector3();
+			var params = {
+			exposure: 1.5
+			};
+			var stats;
+			init();
+			animate();
+			function init() {
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.shadowMap.enabled = true;
+				renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+				renderer.gammaInput = true;
+				renderer.gammaOutput = true;
+				document.body.appendChild( renderer.domElement );
+				var gl = renderer.context;
+
+				if ( ! gl.getExtension( 'OES_texture_float' ) ) {
+					alert( 'OES_texture_float not supported' );
+					throw 'missing webgl extension';
+				}
+				if ( ! gl.getExtension('OES_texture_float_linear' ) ) {
+					alert( 'OES_texture_float_linear not supported' );
+					throw 'missing webgl extension';
+				}
+
+				camera = new THREE.PerspectiveCamera( 80, window.innerWidth / window.innerHeight, 1, 1000 );
+				camera.position.set( 0,8, 48);
+				bufferScene = new THREE.Scene();
+				var ambient = new THREE.AmbientLight( 0xffffff, 0.3 );
+				bufferScene.add( ambient );
+
+				scene = new THREE.Scene();
+
+				var renderTargetParams = {
+				  minFilter:THREE.LinearFilter,
+				  format:THREE.RGBAFormat,
+				  type:THREE.FloatType,
+				  stencilBuffer:false
+				};
+
+				bufferTexture = new THREE.WebGLRenderTarget( 4096, 4096, renderTargetParams );
+
+				bufferTextureMat = new THREE.ShaderMaterial({
+				    uniforms: {
+						tDiffuse:  { value: bufferTexture.texture},
+						exposure:  { value: 0.1},
+						brightMax: { value: 10.0 }
+						},
+					vertexShader: getText( 'vs-hdr' ),
+					fragmentShader: getText( 'fs-hdr' )
+				});
+
+				//compileShader(gl, document.getElementById('vs-hdr').textContent, gl.VERTEX_SHADER);
+				//compileShader(gl, document.getElementById('fs-hdr').textContent, gl.FRAGMENT_SHADER);
+
+				var bufferTextureGeo = new THREE.PlaneGeometry( window.innerWidth, window.innerHeight);
+				bufferTextureMesh = new THREE.Mesh( bufferTextureGeo, bufferTextureMat );
+				bufferTextureMesh.position.z = 30.0;
+				bufferTextureMesh.position.x = 13.0;
+				bufferTextureMesh.rotation.y = -Math.PI/8;
+				bufferTextureMesh.rotation.z = -Math.PI/180;
+				bufferTextureMesh.scale.set(0.1,0.1,0.1);
+				scene.add( bufferTextureMesh );
+
+				spotLight = new THREE.SpotLight( 0xffffff, 75);
+				spotLight.position.set( 0, 0, 10 );
+				spotLight.angle = Math.PI / 8;
+				spotLight.penumbra = 0.5;
+				spotLight.decay = 2;
+				spotLight.distance = 60;
+				spotLight.castShadow = true;
+				spotLight.shadow.mapSize.width = 1024;
+				spotLight.shadow.mapSize.height = 1024;
+				spotLight.shadow.camera.near = 2;
+				spotLight.shadow.camera.far = 50;
+				spotLight.target.position.set(0,-1,-10);
+				bufferScene.add( spotLight.target );
+				bufferScene.add( spotLight );
+				lightHelper = new THREE.SpotLightHelper( spotLight );
+				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
+
+				spotLight = new THREE.SpotLight( 0xffffff, 7);
+				spotLight.position.set( 0, 20, 0 );
+				spotLight.angle = Math.PI / 2;
+				spotLight.penumbra = 0.05;
+				spotLight.decay = 2;
+				spotLight.distance = 60;
+				spotLight.castShadow = true;
+				spotLight.shadow.mapSize.width = 1024;
+				spotLight.shadow.mapSize.height = 1024;
+				spotLight.shadow.camera.near = 2;
+				spotLight.shadow.camera.far = 50;
+				bufferScene.add( spotLight );
+				lightHelper = new THREE.SpotLightHelper( spotLight );
+				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
+
+				spotLight = new THREE.SpotLight( 0xffffff, 75);
+				spotLight.position.set( 40, 11, 0 );
+				spotLight.angle = Math.PI / 40;
+				spotLight.target.position.set(0,-4,0);
+				bufferScene.add( spotLight.target );
+				spotLight.penumbra = 0.5;
+				spotLight.decay = 2;
+				spotLight.distance = 120;
+				spotLight.castShadow = true;
+				spotLight.shadow.mapSize.width = 1024;
+				spotLight.shadow.mapSize.height = 1024;
+				spotLight.shadow.camera.near = 2;
+				spotLight.shadow.camera.far = 50;
+				bufferScene.add( spotLight );
+				lightHelper = new THREE.SpotLightHelper( spotLight );
+				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
+
+				spotLight = new THREE.SpotLight( 0xffffff, 75);
+				spotLight.position.set( 40, 11, 10 );
+				spotLight.angle = Math.PI / 40;
+				spotLight.target.position.set(0,-4,10);
+				bufferScene.add( spotLight.target );
+				spotLight.penumbra = 0.5;
+				spotLight.decay = 2;
+				spotLight.distance = 120;
+				spotLight.castShadow = true;
+				spotLight.shadow.mapSize.width = 1024;
+				spotLight.shadow.mapSize.height = 1024;
+				spotLight.shadow.camera.near = 2;
+				spotLight.shadow.camera.far = 50;
+				bufferScene.add( spotLight );
+				lightHelper = new THREE.SpotLightHelper( spotLight );
+				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
+
+				spotLight = new THREE.SpotLight( 0xffffff, 75);
+				spotLight.position.set( 40, 11, -10 );
+				spotLight.angle = Math.PI / 40;
+				spotLight.target.position.set(0,-4,-10);
+				bufferScene.add( spotLight.target );
+				spotLight.penumbra = 0.5;
+				spotLight.decay = 2;
+				spotLight.distance = 120;
+				spotLight.castShadow = true;
+				spotLight.shadow.mapSize.width = 1024;
+				spotLight.shadow.mapSize.height = 1024;
+				spotLight.shadow.camera.near = 2;
+				spotLight.shadow.camera.far = 50;
+				bufferScene.add( spotLight );
+				lightHelper = new THREE.SpotLightHelper( spotLight );
+				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
+
+				spotLight = new THREE.SpotLight( 0xffffff, 75);
+				spotLight.position.set( 0, 11, 0 );
+				spotLight.angle = Math.PI / 30;
+				spotLight.target.position.set(20,-1,0);
+				bufferScene.add( spotLight.target );
+				spotLight.penumbra = 0.5;
+				spotLight.decay = 2;
+				spotLight.distance = 120;
+				spotLight.castShadow = true;
+				spotLight.shadow.mapSize.width = 1024;
+				spotLight.shadow.mapSize.height = 1024;
+				spotLight.shadow.camera.near = 2;
+				spotLight.shadow.camera.far = 50;
+				bufferScene.add( spotLight );
+				lightHelper = new THREE.SpotLightHelper( spotLight );
+				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
+
+				spotLight = new THREE.SpotLight( 0xffffff, 75);
+				spotLight.position.set( 0, 11, 10 );
+				spotLight.angle = Math.PI / 30;
+				spotLight.target.position.set(20,-1,10);
+				bufferScene.add( spotLight.target );
+				spotLight.penumbra = 0.5;
+				spotLight.decay = 2;
+				spotLight.distance = 120;
+				spotLight.castShadow = true;
+				spotLight.shadow.mapSize.width = 1024;
+				spotLight.shadow.mapSize.height = 1024;
+				spotLight.shadow.camera.near = 2;
+				spotLight.shadow.camera.far = 50;
+				bufferScene.add( spotLight );
+				lightHelper = new THREE.SpotLightHelper( spotLight );
+				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
+
+				spotLight = new THREE.SpotLight( 0xffffff, 75);
+				spotLight.position.set( 0, 11, -10 );
+				spotLight.angle = Math.PI / 30;
+				spotLight.target.position.set(20,-1,-10);
+				bufferScene.add( spotLight.target );
+				spotLight.penumbra = 0.5;
+				spotLight.decay = 2;
+				spotLight.distance = 120;
+				spotLight.castShadow = true;
+				spotLight.shadow.mapSize.width = 1024;
+				spotLight.shadow.mapSize.height = 1024;
+				spotLight.shadow.camera.near = 2;
+				spotLight.shadow.camera.far = 50;
+				bufferScene.add( spotLight );
+				lightHelper = new THREE.SpotLightHelper( spotLight );
+				shadowCameraHelper = new THREE.CameraHelper( spotLight.shadow.camera );
+
+
+				var geoFloor = new THREE.BoxBufferGeometry( 30, 15, 30 );
+				var standardMaterial = new THREE.MeshStandardMaterial( {color: 0x888888, transparent: false,side: THREE.BackSide, metalness: 0.0, roughness: 0.6} );
+				mesh = new THREE.Mesh( geoFloor, standardMaterial);
+				mesh.receiveShadow = true;
+				bufferScene.add( mesh );
+
+
+				var textureLoader = new THREE.TextureLoader();
+				textureLoader.load( "textures/brick_diffuse.jpg", function( map ) {
+					map.wrapS = THREE.RepeatWrapping;
+					map.wrapT = THREE.RepeatWrapping;
+					map.anisotropy = 4;
+					map.repeat.set( 9, 0.5 );
+					standardMaterial.map = map;
+					standardMaterial.needsUpdate = true;
+				} );	
+
+				textureLoader.load( "textures/brick_bump.jpg", function( map ) {
+					map.wrapS = THREE.RepeatWrapping;
+					map.wrapT = THREE.RepeatWrapping;
+					map.anisotropy = 4;
+					map.repeat.set( 9, 0.5 );
+					standardMaterial.bumpMap = map;
+					standardMaterial.needsUpdate = true;
+				} );			
+
+				textureLoader.load( "textures/brick_roughness.jpg", function( map ) {
+					map.wrapS = THREE.RepeatWrapping;
+					map.wrapT = THREE.RepeatWrapping;
+					map.anisotropy = 4;
+					map.repeat.set( 9, 0.5 );
+					standardMaterial.roughnessMap = map;
+					standardMaterial.needsUpdate = true;
+				} );			
+
+
+				var matStdObjects = new THREE.MeshStandardMaterial( { color: 0xA00000, roughness: 0.4, metalness: 0.7 } );
+				var matStdBox = new THREE.MeshStandardMaterial( { color: 0x001FE2, roughness: 0.4, metalness: 0.9 } );
+				var geoBox = new THREE.BoxBufferGeometry( Math.PI*3, Math.sqrt( 2 )*2, Math.E );
+				var mshStdBox = new THREE.Mesh( geoBox, matStdBox );
+				mshStdBox.position.set( 13, -6, 0 );
+				mshStdBox.rotation.set( 0, Math.PI / 2.0, 0 );
+				mshStdBox.castShadow = true;
+				mshStdBox.receiveShadow = true;
+				bufferScene.add( mshStdBox );
+				var geoSphere = new THREE.SphereBufferGeometry( 2, 48, 48 );
+				var matStdSphere = new THREE.MeshStandardMaterial( { color: 0x00FF00, roughness: 0.5, metalness: 0.8 } );
+				var mshStdSphere = new THREE.Mesh( geoSphere, matStdSphere);
+				mshStdSphere.position.set( - 12, -5.6, 13 );
+				mshStdSphere.castShadow = true;
+				mshStdSphere.receiveShadow = true;
+				bufferScene.add( mshStdSphere );
+				var geoKnot = new THREE.TorusKnotBufferGeometry( 1, 0.3, 100, 16 );
+				var mshStdKnot = new THREE.Mesh( geoKnot, matStdObjects );
+				mshStdKnot.position.set( 2.5, -2.5, 0 );
+				//mshStdKnot.rotation.x =  Math.PI/ 4.0;
+				mshStdKnot.castShadow = true;
+				mshStdKnot.receiveShadow = true;
+				bufferScene.add( mshStdKnot );
+
+				var mtlLoaderTable = new THREE.MTLLoader();
+				mtlLoaderTable.setBaseUrl('models/table/');
+				mtlLoaderTable.setPath('models/table/');
+				mtlLoaderTable.load('table.mtl', function (materials) {
+				    materials.preload();
+				    materials.materials.b0b0b0.magFilter = THREE.NearestFilter;
+				    materials.materials.b0b0b0.minFilter = THREE.LinearFilter;
+				    var objLoaderTable = new THREE.OBJLoader();
+				    objLoaderTable.setMaterials(materials);
+				    objLoaderTable.setPath('models/table/');
+				    objLoaderTable.load('table.obj', function (object) {
+					object.position.y = -7.5;
+					    object.position.z = 0;
+					    object.position.x = 2;
+					    object.scale.set(2,2,2);
+						object.traverse( function ( child ) {
+						    if ( child instanceof THREE.Mesh ) {
+							 child.castShadow = true;
+						    }
+						});
+						    bufferScene.add(object);
+								});
+					});
+
+				var mtlLoaderChair = new THREE.MTLLoader();
+				mtlLoaderChair.setBaseUrl('models/chair/');
+				mtlLoaderChair.setPath('models/chair/');
+				mtlLoaderChair.load('chair.mtl', function (materials) {
+				    materials.preload();
+				    materials.materials.fusta_taula.map.magFilter = THREE.NearestFilter;
+				    materials.materials.fusta_taula.map.minFilter = THREE.LinearFilter;
+				    var objLoaderChair = new THREE.OBJLoader();
+				    objLoaderChair.setMaterials(materials);
+				    objLoaderChair.setPath('models/chair/');
+				    objLoaderChair.load('chair.obj', function (object) {
+					    object.position.y = -7.5;
+					    object.position.z = -1;
+					    object.position.x = 1;
+					    object.scale.set(5,5,5);
+					    object.rotation.y = -1.6;
+						object.traverse( function ( child ) {
+						    if ( child instanceof THREE.Mesh ) {
+							 child.castShadow = true;
+						    }
+						});
+					    bufferScene.add(object);
+				    });
+				   objLoaderChair.load('chair.obj', function (object) {
+					    object.position.y = -7.5;
+					    object.position.z = 1.1;
+					    object.position.x = 2.8;
+					    object.scale.set(5,5,5);
+					    object.rotation.y = 1.6;
+					    object.traverse( function ( child ) {
+						    if ( child instanceof THREE.Mesh ) {
+							 child.castShadow = true;
+						    }
+						});
+					    bufferScene.add(object);
+				      });
+				});				
+
+				var mtlLoaderR2D2 = new THREE.MTLLoader();
+				mtlLoaderR2D2.setBaseUrl('models/r2-d2/');
+				mtlLoaderR2D2.setPath('models/r2-d2/');
+				mtlLoaderR2D2.load('r2-d2.mtl', function (materials) {
+				    materials.preload();
+				    materials.materials.R2D2_IlluminationMaterial.magFilter = THREE.NearestFilter;
+				    materials.materials.R2D2_IlluminationMaterial.minFilter = THREE.LinearFilter;
+				    var objLoaderR2D2 = new THREE.OBJLoader();
+				    objLoaderR2D2.setMaterials(materials);
+				    objLoaderR2D2.setPath('models/r2-d2/');
+				    objLoaderR2D2.load('r2-d2.obj', function (object) {
+						object.position.y = -7.5;
+						object.position.z = 6;
+						object.position.x = -6;
+						object.scale.set(0.03,0.03,0.03);
+						object.rotation.y = Math.PI/4;
+						object.traverse( function ( child ) {
+						    if ( child instanceof THREE.Mesh ) {
+							 child.castShadow = true;
+						    }
+						});
+						bufferScene.add(object);
+					});
+				    objLoaderR2D2.load('r2-d2.obj', function (object) {
+						object.position.y = -7.5;
+						object.position.z = -8;
+						object.position.x = -6;
+						object.scale.set(0.03,0.03,0.03);
+						object.rotation.y = Math.PI/2;
+						object.traverse( function ( child ) {
+							if ( child instanceof THREE.Mesh ) {
+								 child.castShadow = true;
+							}
+						});
+						bufferScene.add(object);
+					});
+				 });
+
+
+
+				var mtlLoaderBB = new THREE.MTLLoader();
+				mtlLoaderBB.setBaseUrl('models/bb/');
+				mtlLoaderBB.setPath('models/bb/');
+				mtlLoaderBB.load('bb-unit.mtl', function (materials) {
+				    materials.preload();
+				    materials.materials.Body_DiffuseMaterial.magFilter = THREE.NearestFilter;
+				    materials.materials.Body_DiffuseMaterial.minFilter = THREE.LinearFilter;
+				    var objLoaderBB = new THREE.OBJLoader();
+				    objLoaderBB.setMaterials(materials);
+				    objLoaderBB.setPath('models/bb/');
+				    objLoaderBB.load('bb-unit.obj', function (object) {
+						object.position.y = 0;
+						object.position.z = -8;
+						object.position.x = 10;
+						object.scale.set(0.02,0.02,0.02);
+						object.rotation.z = Math.PI/4;
+						object.rotation.y = Math.PI/4;
+						object.traverse( function ( child ) {
+						    if ( child instanceof THREE.Mesh ) {
+							 child.castShadow = true;
+						    }
+						});
+						bufferScene.add(object);
+					});
+				});
+
+				var loader = new THREE.OBJLoader();
+				loader.load(
+					'models/roundWindow/roundWindow.obj',
+					function ( object ) {
+					    object.position.y = 2;
+						object.position.z = 0;
+						object.position.x = 15;
+						object.scale.set(0.05,0.05,0.05);
+						//object.rotation.z = Math.PI/4;
+						object.rotation.y = Math.PI/2;
+						bufferScene.add( object );
+					}
+				);
+
+				var loader = new THREE.OBJLoader();
+				loader.load(
+					'models/roundWindow/roundWindow.obj',
+					function ( object ) {
+					    object.position.y = 2;
+						object.position.z = 10;
+						object.position.x = 15;
+						object.scale.set(0.05,0.05,0.05);
+						//object.rotation.z = Math.PI/4;
+						object.rotation.y = Math.PI/2;
+						bufferScene.add( object );
+					}
+				);
+
+				var loader = new THREE.OBJLoader();
+				loader.load(
+					'models/roundWindow/roundWindow.obj',
+					function ( object ) {
+					    object.position.y = 2;
+						object.position.z = -10;
+						object.position.x = 15;
+						object.scale.set(0.05,0.05,0.05);
+						//object.rotation.z = Math.PI/4;
+						object.rotation.y = Math.PI/2;
+						bufferScene.add( object );
+					}
+				);
+
+
+				var controls = new THREE.OrbitControls( camera, renderer.domElement );
+				controls.target.copy( mshStdBox.position );
+				controls.update();
+
+				stats = new Stats();
+				container.appendChild( stats.dom );
+
+				var gui = new dat.GUI();
+				gui.add( params, 'exposure', 0.1, 10.0 ).onChange( animate );
+				gui.open();
+
+			}
+
+			function onResize() {
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				camera.aspect = ( window.innerWidth / window.innerHeight );
+				camera.updateProjectionMatrix();
+			}
+
+			function animate() {
+				requestAnimationFrame( animate );
+
+				bufferTextureMat.uniforms.exposure.value = params.exposure;
+
+				renderer.render( bufferScene, camera , bufferTexture, true );
+				renderer.render ( scene, camera);
+				stats.update();
+			}
+
+			function getText( id ) {
+				return document.getElementById( id ).textContent;
+			}
+
+			function compileShader(gl, shaderSource, shaderType) {
+			  // Create the shader object
+			  var shader = gl.createShader(shaderType);
+
+			  // Set the shader source code.
+			  gl.shaderSource(shader, shaderSource);
+
+			  // Compile the shader
+			  gl.compileShader(shader);
+
+			  // Check if it compiled
+			  var success = gl.getShaderParameter(shader, gl.COMPILE_STATUS);
+			  if (!success) {
+				// Something went wrong during compilation; get the error
+				throw "could not compile shader:" + gl.getShaderInfoLog(shader);
+			  }
+
+			  return shader;
+			}
+
+
+		</script>
+	</body>
+</html>
